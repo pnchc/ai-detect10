@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Detector — Перевірка тексту на ШІ</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c10;
+    --surface: #12151c;
+    --surface2: #1a1e28;
+    --border: #252a38;
+    --accent: #4fffb0;
+    --text: #e8eaf0;
+    --muted: #7a8099;
+    --human: #4fffb0;
+    --mixed: #ffc46b;
+    --ai: #ff6b6b;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'DM Sans', sans-serif; min-height: 100vh; overflow-x: hidden;
+  }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(79,255,176,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(79,255,176,0.03) 1px, transparent 1px);
+    background-size: 40px 40px; pointer-events: none; z-index: 0;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 32px; background: rgba(10,12,16,0.88);
+    backdrop-filter: blur(16px); border-bottom: 1px solid var(--border);
+  }
+  .logo {
+    font-family: 'Syne', sans-serif; font-weight: 800; font-size: 20px;
+    letter-spacing: -0.5px; display: flex; align-items: center; gap: 10px;
+  }
+  .logo-icon {
+    width: 32px; height: 32px; background: var(--accent); border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; font-size: 16px;
+  }
+  .logo span { color: var(--accent); }
+  .nav-pills {
+    display: flex; gap: 4px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 12px; padding: 4px;
+  }
+  .nav-pill {
+    padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 500;
+    color: var(--muted); cursor: pointer; transition: all 0.2s; white-space: nowrap;
+  }
+  .nav-pill:hover { color: var(--text); background: var(--surface2); }
+  .nav-pill.active { background: var(--accent); color: #000; font-weight: 600; }
+  .nav-cta {
+    background: transparent; border: 1px solid var(--border); color: var(--text);
+    padding: 8px 18px; border-radius: 10px; font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: all 0.2s; font-family: 'DM Sans', sans-serif;
+  }
+  .nav-cta:hover { border-color: var(--accent); color: var(--accent); }
+
+  .hero {
+    position: relative; z-index: 1; padding: 52px 32px 36px;
+    max-width: 900px; margin: 0 auto; text-align: center;
+  }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(79,255,176,0.08); border: 1px solid rgba(79,255,176,0.2);
+    border-radius: 100px; padding: 6px 16px; font-size: 12px; font-weight: 500;
+    color: var(--accent); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 20px;
+  }
+  .hero-badge::before {
+    content: ''; width: 6px; height: 6px; background: var(--accent);
+    border-radius: 50%; box-shadow: 0 0 8px var(--accent);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
+  h1 {
+    font-family: 'Syne', sans-serif; font-weight: 800;
+    font-size: clamp(30px, 5vw, 50px); line-height: 1.1;
+    letter-spacing: -1.5px; margin-bottom: 14px;
+  }
+  h1 .highlight { color: var(--accent); }
+  .hero-sub {
+    color: var(--muted); font-size: 15px; line-height: 1.6;
+    max-width: 520px; margin: 0 auto 36px; font-weight: 300;
+  }
+
+  /* TOOL */
+  .tool-container {
+    position: relative; z-index: 1; max-width: 900px;
+    margin: 0 auto 24px; padding: 0 32px;
+  }
+  .tool-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 20px; overflow: hidden; box-shadow: 0 24px 80px rgba(0,0,0,.5);
+  }
+  .tool-top {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 20px; border-bottom: 1px solid var(--border); gap: 10px; flex-wrap: wrap;
+  }
+  .word-count { font-size: 13px; color: var(--muted); }
+  .word-count strong { color: var(--text); font-weight: 600; }
+
+  .sample-btns { display: flex; gap: 6px; }
+  .btn-sample {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--muted);
+    border-radius: 8px; padding: 5px 12px; font-size: 12px; font-weight: 500;
+    cursor: pointer; transition: all .2s; font-family: 'DM Sans', sans-serif;
+  }
+  .btn-sample:hover { color: var(--text); border-color: rgba(79,255,176,.3); }
+  .btn-sample.human:hover { color: var(--human); }
+  .btn-sample.ai-btn:hover { color: var(--ai); }
+  .btn-sample.clear:hover { color: var(--ai); border-color: rgba(255,107,107,.3); }
+
+  .tool-body { display: grid; grid-template-columns: 1fr 272px; min-height: 300px; }
+  .text-area-wrap { border-right: 1px solid var(--border); position: relative; }
+  textarea {
+    width: 100%; height: 100%; min-height: 300px; background: transparent;
+    border: none; outline: none; resize: none; color: var(--text);
+    font-family: 'DM Sans', sans-serif; font-size: 15px; line-height: 1.75;
+    font-weight: 300; padding: 22px; caret-color: var(--accent);
+  }
+  textarea::placeholder { color: var(--muted); font-style: italic; }
+
+  /* SENSITIVITY */
+  .sensitivity-row {
+    padding: 10px 20px; border-top: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .sens-label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .sens-label strong { color: var(--accent); }
+  input[type=range] {
+    flex: 1; min-width: 100px; accent-color: var(--accent);
+    height: 4px; background: var(--surface2); border-radius: 4px;
+    outline: none; cursor: pointer;
+  }
+
+  /* RESULTS PANEL */
+  .results-panel {
+    padding: 22px 18px; display: flex; flex-direction: column; gap: 14px;
+  }
+  .score-ring {
+    display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 0;
+  }
+  .ring-wrap { position: relative; width: 108px; height: 108px; }
+  .ring-svg { transform: rotate(-90deg); width: 108px; height: 108px; }
+  .ring-bg { fill: none; stroke: var(--border); stroke-width: 8; }
+  .ring-fill {
+    fill: none; stroke-width: 8; stroke-linecap: round;
+    stroke-dasharray: 283; stroke-dashoffset: 283;
+    transition: stroke-dashoffset 1s cubic-bezier(.4,0,.2,1), stroke .4s;
+  }
+  .ring-label {
+    position: absolute; inset: 0; display: flex;
+    flex-direction: column; align-items: center; justify-content: center;
+  }
+  .ring-pct {
+    font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800;
+    line-height: 1; transition: color .4s;
+  }
+  .ring-sub { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .score-title {
+    font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700;
+    text-align: center; transition: color .4s;
+  }
+
+  .breakdown { display: flex; flex-direction: column; gap: 9px; }
+  .breakdown-row { display: flex; flex-direction: column; gap: 4px; }
+  .breakdown-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+  .breakdown-label span:last-child { font-weight: 600; color: var(--text); }
+  .breakdown-bar { height: 5px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+  .breakdown-fill { height: 100%; border-radius: 3px; width: 0%; transition: width 1s cubic-bezier(.4,0,.2,1); }
+  .fill-ai { background: var(--ai); }
+  .fill-mixed { background: var(--mixed); }
+  .fill-human { background: var(--human); }
+
+  .metrics-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-top: 1px solid var(--border); padding-top: 12px;
+  }
+  .metric-box {
+    background: var(--surface2); border-radius: 10px; padding: 10px;
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .metric-box span:first-child { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .metric-box span:last-child { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; }
+
+  .placeholder-msg {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 8px; color: var(--muted); font-size: 13px;
+    text-align: center; padding: 12px;
+  }
+  .placeholder-icon { font-size: 26px; opacity: .4; }
+
+  .tool-bottom {
+    padding: 14px 20px; border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  }
+  .disclaimer { font-size: 11px; color: var(--muted); max-width: 420px; line-height: 1.5; }
+  .btn-detect {
+    background: var(--accent); color: #000; border: none; border-radius: 12px;
+    padding: 12px 28px; font-family: 'Syne', sans-serif; font-weight: 700;
+    font-size: 14px; cursor: pointer; letter-spacing: -.3px; transition: all .2s; white-space: nowrap;
+  }
+  .btn-detect:hover { opacity: .9; }
+  .btn-detect:active { transform: scale(.97); }
+
+  /* HIGHLIGHT OUTPUT */
+  .highlight-section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 24px; display: none;
+  }
+  .highlight-section h3 {
+    font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700;
+    margin-bottom: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px;
+  }
+  .legend { display: flex; gap: 18px; margin-bottom: 14px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; }
+  .highlighted-text { font-size: 15px; line-height: 1.85; font-weight: 300; }
+  .s-highlight { border-radius: 3px; padding: 1px 2px; transition: background .3s; cursor: default; }
+
+  /* FEATURES */
+  .features {
+    position: relative; z-index: 1; max-width: 900px;
+    margin: 40px auto 0; padding: 0 32px 60px;
+  }
+  .section-label {
+    font-size: 11px; font-weight: 600; color: var(--accent);
+    text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px;
+  }
+  .features h2 {
+    font-family: 'Syne', sans-serif; font-size: clamp(20px,3vw,30px);
+    font-weight: 800; letter-spacing: -.8px; margin-bottom: 28px; max-width: 380px;
+  }
+  .features-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px,1fr)); gap: 14px; }
+  .feature-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 22px; transition: border-color .2s, transform .2s;
+  }
+  .feature-card:hover { border-color: rgba(79,255,176,.3); transform: translateY(-2px); }
+  .feature-icon { font-size: 22px; margin-bottom: 12px; display: block; }
+  .feature-card h4 { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; margin-bottom: 5px; }
+  .feature-card p { font-size: 12px; color: var(--muted); line-height: 1.6; font-weight: 300; }
+
+  @media (max-width: 640px) {
+    nav { padding: 12px 16px; }
+    .nav-pills { display: none; }
+    .hero { padding: 36px 16px 24px; }
+    .tool-container { padding: 0 16px; }
+    .tool-body { grid-template-columns: 1fr; }
+    .text-area-wrap { border-right: none; border-bottom: 1px solid var(--border); }
+    .features { padding: 28px 16px 48px; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">
+    <div class="logo-icon">🔍</div>
+    AI<span>Detect</span>
+  </div>
+  <div class="nav-pills">
+    <div class="nav-pill active">AI Detector</div>
+    <div class="nav-pill">Paraphraser</div>
+    <div class="nav-pill">Grammar</div>
+    <div class="nav-pill">Plagiarism</div>
+    <div class="nav-pill">Humanizer</div>
+  </div>
+  <button class="nav-cta">Upgrade ✦</button>
+</nav>
+
+<section class="hero">
+  <div class="hero-badge">Без API — Повністю локально</div>
+  <h1>Перевір текст на<br><span class="highlight">штучний інтелект</span></h1>
+  <p class="hero-sub">Аналізує ритміку, структуру та мовні паттерни тексту. Працює повністю у браузері — без реєстрації та API-ключів.</p>
+</section>
+
+<div class="tool-container">
+  <div class="tool-card">
+
+    <div class="tool-top">
+      <span class="word-count">Слів: <strong id="wordCountDisplay">0</strong></span>
+      <div class="sample-btns">
+        <button class="btn-sample human" onclick="loadSample('human')">✍️ Шаблон людини</button>
+        <button class="btn-sample ai-btn" onclick="loadSample('ai')">🤖 Шаблон ШІ</button>
+        <button class="btn-sample clear" onclick="clearText()">✕ Очистити</button>
+      </div>
+    </div>
+
+    <div class="tool-body">
+      <div class="text-area-wrap">
+        <textarea id="inputText"
+          placeholder="Вставте або введіть текст для аналізу…&#10;&#10;Алгоритм аналізує: варіативність речень, маркери ШІ, ритміку та предсказуваність структури."
+          spellcheck="false"
+          oninput="updateWordCount()"></textarea>
+      </div>
+
+      <div class="results-panel">
+        <div class="placeholder-msg" id="placeholderState">
+          <span class="placeholder-icon">🤖</span>
+          <span>Введіть текст і натисніть<br><strong style="color:var(--text)">"Аналізувати"</strong></span>
+        </div>
+        <div id="resultsState" style="display:none;flex-direction:column;gap:14px;">
+          <div class="score-ring">
+            <div class="ring-wrap">
+              <svg class="ring-svg" viewBox="0 0 100 100">
+                <circle class="ring-bg" cx="50" cy="50" r="45"/>
+                <circle class="ring-fill" id="ringFill" cx="50" cy="50" r="45"/>
+              </svg>
+              <div class="ring-label">
+                <span class="ring-pct" id="ringPct">–</span>
+                <span class="ring-sub">AI Score</span>
+              </div>
+            </div>
+            <span class="score-title" id="scoreTitle">–</span>
+          </div>
+          <div class="breakdown">
+            <div class="breakdown-row">
+              <div class="breakdown-label"><span>🤖 AI-генерований</span><span id="aiPct">–%</span></div>
+              <div class="breakdown-bar"><div class="breakdown-fill fill-ai" id="aiFill"></div></div>
+            </div>
+            <div class="breakdown-row">
+              <div class="breakdown-label"><span>🔀 Змішаний</span><span id="mixedPct">–%</span></div>
+              <div class="breakdown-bar"><div class="breakdown-fill fill-mixed" id="mixedFill"></div></div>
+            </div>
+            <div class="breakdown-row">
+              <div class="breakdown-label"><span>✍️ Людський</span><span id="humanPct">–%</span></div>
+              <div class="breakdown-bar"><div class="breakdown-fill fill-human" id="humanFill"></div></div>
+            </div>
+          </div>
+          <div class="metrics-row">
+            <div class="metric-box">
+              <span>Ритміка</span>
+              <span id="metricBurstiness" style="color:var(--accent)">–</span>
+            </div>
+            <div class="metric-box">
+              <span>Маркери ШІ</span>
+              <span id="metricMarkers" style="color:var(--ai)">–</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sensitivity-row">
+      <span class="sens-label">Чутливість: <strong id="sensitivityValue">50%</strong></span>
+      <input type="range" id="sensitivitySlider" min="10" max="100" value="50"
+        oninput="document.getElementById('sensitivityValue').textContent=this.value+'%'">
+    </div>
+
+    <div class="tool-bottom">
+      <p class="disclaimer">⚠️ Локальний алгоритм. Результати орієнтовні — не використовуйте як єдиний аргумент.</p>
+      <button class="btn-detect" onclick="analyzeText()">Аналізувати</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- HIGHLIGHTED TEXT -->
+<div class="tool-container">
+  <div class="highlight-section" id="highlightSection">
+    <h3>Детальний аналіз речень</h3>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(255,107,107,.7)"></div>AI-генероване</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(255,196,107,.6)"></div>Підозріле</div>
+      <div class="legend-item"><div class="legend-dot" style="background:transparent;border:1px solid var(--border)"></div>Людське</div>
+    </div>
+    <div class="highlighted-text" id="highlightedText"></div>
+  </div>
+</div>
+
+<section class="features">
+  <p class="section-label">Як це працює</p>
+  <h2>Локальний аналіз без ШІ-залежностей</h2>
+  <div class="features-grid">
+    <div class="feature-card"><span class="feature-icon">📏</span><h4>Варіативність речень</h4><p>ШІ пише рівномірно. Аналізуємо стандартне відхилення довжини — низьке = підозрілий текст.</p></div>
+    <div class="feature-card"><span class="feature-icon">🏷️</span><h4>Маркери ШІ</h4><p>Пошук кліше: "важливо зазначити", "таким чином", "крім того" та інших шаблонних зворотів.</p></div>
+    <div class="feature-card"><span class="feature-icon">🎚️</span><h4>Регульована чутливість</h4><p>Слайдер дозволяє підлаштувати строгість алгоритму під конкретний тип тексту.</p></div>
+    <div class="feature-card"><span class="feature-icon">🔒</span><h4>100% офлайн</h4><p>Жодного API, жодних серверів. Весь аналіз відбувається прямо у твоєму браузері.</p></div>
+    <div class="feature-card"><span class="feature-icon">🎨</span><h4>Підсвічування речень</h4><p>Кожне речення забарвлюється відповідно до ймовірності AI-генерації — від зеленого до червоного.</p></div>
+    <div class="feature-card"><span class="feature-icon">⚡</span><h4>Миттєво</h4><p>Результат з'являється за мілісекунди. Без очікування, без черг, без реєстрації.</p></div>
+  </div>
+</section>
+
+<script>
+  // ─── SAMPLES ────────────────────────────────────────────────
+  const samples = {
+    ai: "Штучний інтелект створює тексти на основі глибокого навчання. Важливо зазначити, що алгоритми оптимізують кожне слово для максимальної передбачуваності. Крім того, структура речень зазвичай залишається дуже стабільною. Отже, автоматично згенерований контент має низьку варіативність довжини речень та високу регулярність шаблонів. Таким чином, детекція базується на математичних моделях мови, які оцінюють вірогідність лінгвістичних ланцюжків. Слід підкреслити, що сучасні мовні моделі демонструють вражаючу здатність генерувати граматично бездоганні тексти. В цілому, розвиток штучного інтелекту відкриває нові можливості для автоматизації контентного виробництва.",
+    human: "Слухай, я вчора нарешті спробував той новий сервіс, про який всі гудуть. Чесно кажучи, враження дуже змішані — дизайн стильний, але все постійно підвисає! Думаю, поки що повернуся до старої перевіреної програми. Хоча, хто знає... може розробники нарешті випустять нормальне оновлення. Вчора ще й зустрів Сашка випадково — він каже взагалі не користується такими штуками. Ну і правильно, мабуть."
+  };
+
+  // ─── AI MARKERS (укр + рос транслітерація) ──────────────────
+  const aiKeywords = [
+    "важливо зазначити","крім того","отже","таким чином","зокрема",
+    "слід підкреслити","варто звернути увагу","в цілому","на завершення",
+    "як згадувалося раніше","це свідчить про","іншими словами",
+    "необхідно відзначити","варто зазначити","слід зауважити",
+    "в першу чергу","перш за все","з одного боку","з іншого боку",
+    "підсумовуючи","таким образом","следует отметить","кроме того",
+    "it is important to note","furthermore","moreover","in conclusion",
+    "it should be noted","in summary","to summarize","additionally",
+    "in addition","as mentioned","on the other hand","first and foremost"
+  ];
+
+  // ─── HELPERS ─────────────────────────────────────────────────
+  function updateWordCount() {
+    const words = document.getElementById('inputText').value.trim().split(/\s+/).filter(w=>w.length>0);
+    document.getElementById('wordCountDisplay').textContent = words.length;
+  }
+
+  function loadSample(type) {
+    document.getElementById('inputText').value = samples[type];
+    updateWordCount();
+  }
+
+  function clearText() {
+    document.getElementById('inputText').value = '';
+    updateWordCount();
+    document.getElementById('highlightSection').style.display = 'none';
+    document.getElementById('placeholderState').style.display = 'flex';
+    document.getElementById('resultsState').style.display = 'none';
+    resetRing();
+  }
+
+  function resetRing() {
+    document.getElementById('ringFill').style.strokeDashoffset = 283;
+    document.getElementById('ringPct').textContent = '–';
+    document.getElementById('scoreTitle').textContent = '–';
+    document.getElementById('aiPct').textContent = '–%';
+    document.getElementById('mixedPct').textContent = '–%';
+    document.getElementById('humanPct').textContent = '–%';
+    document.getElementById('aiFill').style.width = '0%';
+    document.getElementById('mixedFill').style.width = '0%';
+    document.getElementById('humanFill').style.width = '0%';
+    document.getElementById('metricBurstiness').textContent = '–';
+    document.getElementById('metricMarkers').textContent = '–';
+  }
+
+  // ─── MAIN ANALYSIS ───────────────────────────────────────────
+  function analyzeText() {
+    const text = document.getElementById('inputText').value.trim();
+    if (!text) { alert('Введіть текст для аналізу.'); return; }
+
+    const sensitivity = parseInt(document.getElementById('sensitivitySlider').value) / 50;
+
+    // Split into sentences
+    let sentences = text.match(/[^.!?…]+[.!?…]+/g) || [text];
+    sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
+
+    let totalScore = 0;
+    let sentenceLengths = [];
+    let totalMarkers = 0;
+    let htmlParts = [];
+
+    sentences.forEach(sentence => {
+      const words = sentence.split(/\s+/).filter(w => w.length > 0);
+      const wc = words.length;
+      sentenceLengths.push(wc);
+
+      let score = 38; // base
+
+      // Factor 1: sentence length (AI prefers 8-18 words)
+      if (wc >= 8 && wc <= 18) score += 18;
+      else if (wc < 4 || wc > 30) score -= 18;
+      else score -= 6;
+
+      // Factor 2: AI keyword markers
+      const lower = sentence.toLowerCase();
+      let markersHere = 0;
+      aiKeywords.forEach(kw => { if (lower.includes(kw)) { markersHere++; totalMarkers++; } });
+      score += markersHere * 28;
+
+      // Factor 3: punctuation variety (humans use more !, ?, —, …)
+      const specialPunct = (sentence.match(/[!?—…]/g) || []).length;
+      if (specialPunct >= 2) score -= 12;
+      else if (specialPunct === 0) score += 5;
+
+      // Factor 4: first-person pronouns (humans use more)
+      const firstPerson = (lower.match(/\b(я|мені|мене|мій|моя|моє|мої|ми|нас|нам|наш)\b/g) || []).length;
+      if (firstPerson >= 2) score -= 14;
+
+      // Factor 5: colloquial words
+      const colloquial = (lower.match(/\b(слухай|чесно|мабуть|взагалі|нарешті|якось|десь|хтось|щось|ніби|хоча)\b/g) || []).length;
+      if (colloquial >= 1) score -= 16;
+
+      score = Math.max(5, Math.min(95, score));
+      totalScore += score;
+
+      // Color highlight
+      const prob = Math.min(100, Math.round(score * sensitivity));
+      let bg = 'transparent';
+      if (prob >= 70) bg = `rgba(255,107,107,${0.15 + (prob-70)/100 * 0.45})`;
+      else if (prob >= 42) bg = `rgba(255,196,107,${0.12 + (prob-42)/60 * 0.35})`;
+
+      const escaped = sentence.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      htmlParts.push(`<span class="s-highlight" style="background:${bg}" title="AI-ймовірність: ${prob}%">${escaped}</span>`);
+    });
+
+    // Burstiness (std deviation of sentence lengths)
+    const avg = sentenceLengths.reduce((a,b)=>a+b,0) / sentenceLengths.length;
+    const variance = sentenceLengths.reduce((a,b)=>a+Math.pow(b-avg,2),0) / sentenceLengths.length;
+    const stdDev = parseFloat(Math.sqrt(variance).toFixed(1));
+
+    // Global score
+    let globalBase = totalScore / sentences.length;
+    if (stdDev < 2) globalBase += 22;
+    else if (stdDev < 4) globalBase += 10;
+    else if (stdDev > 7) globalBase -= 18;
+
+    let finalScore = Math.max(0, Math.min(100, Math.round(globalBase * sensitivity)));
+
+    // Breakdown
+    let aiPct, mixedPct, humanPct;
+    if (finalScore >= 70) {
+      aiPct = finalScore; mixedPct = Math.round((100 - finalScore) * 0.7); humanPct = 100 - aiPct - mixedPct;
+    } else if (finalScore >= 35) {
+      mixedPct = Math.round(finalScore * 0.6); aiPct = finalScore - mixedPct; humanPct = 100 - aiPct - mixedPct;
+    } else {
+      humanPct = 100 - finalScore; mixedPct = Math.round(finalScore * 0.6); aiPct = finalScore - mixedPct;
+    }
+    humanPct = Math.max(0, humanPct);
+
+    renderResults(finalScore, aiPct, mixedPct, humanPct, stdDev, totalMarkers, htmlParts.join(' '));
+  }
+
+  function renderResults(score, aiP, mixedP, humanP, burstiness, markers, html) {
+    document.getElementById('placeholderState').style.display = 'none';
+    const rs = document.getElementById('resultsState');
+    rs.style.display = 'flex';
+
+    // Ring
+    const offset = 283 - (score / 100) * 283;
+    const ring = document.getElementById('ringFill');
+    ring.style.strokeDashoffset = offset;
+    let color = '#4fffb0';
+    if (score >= 70) color = '#ff6b6b';
+    else if (score >= 35) color = '#ffc46b';
+    ring.style.stroke = color;
+    document.getElementById('ringPct').textContent = score + '%';
+    document.getElementById('ringPct').style.color = color;
+
+    const titles = score >= 70 ? 'Переважно AI' : score >= 35 ? 'Змішаний' : 'Людський';
+    document.getElementById('scoreTitle').textContent = titles;
+    document.getElementById('scoreTitle').style.color = color;
+
+    // Bars
+    setTimeout(() => {
+      document.getElementById('aiPct').textContent = aiP + '%';
+      document.getElementById('mixedPct').textContent = mixedP + '%';
+      document.getElementById('humanPct').textContent = humanP + '%';
+      document.getElementById('aiFill').style.width = aiP + '%';
+      document.getElementById('mixedFill').style.width = mixedP + '%';
+      document.getElementById('humanFill').style.width = humanP + '%';
+    }, 80);
+
+    // Metrics
+    document.getElementById('metricBurstiness').textContent = burstiness;
+    document.getElementById('metricMarkers').textContent = markers;
+
+    // Highlighted text
+    const hs = document.getElementById('highlightSection');
+    hs.style.display = 'block';
+    document.getElementById('highlightedText').innerHTML = html;
+
+    // Scroll to results on mobile
+    if (window.innerWidth < 640) {
+      hs.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+</script>
+</body>
+</html>
